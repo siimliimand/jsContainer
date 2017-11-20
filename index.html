@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<!--
+To change this license header, choose License Headers in Project Properties.
+To change this template file, choose Tools | Templates
+and open the template in the editor.
+-->
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title></title>
+    </head>
+    <body>
+        <section id="main">
+            Bla bla bla text text text.
+        </section>
+        
+        <script>
+            var JsContainerOptions = window.JsContainerOptions = {
+                jsContainerFile: './assets/js/js.container.js',
+                files: {
+                    css: {
+                        app: './assets/css/app.css'
+                    },
+                    js: {
+                        jquery: {
+                            url: 'https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js',
+                            autoLoad: true
+                        },
+                        Test: {
+                            url: './assets/js/test.js',
+                            autoLoad: true
+                        },
+                        Test2: {
+                            url: './assets/js/test2.js',
+                            autoLoad: false,
+                            arguments: {
+                                test: function() {
+                                    return window.JsContainer.get('Test');
+                                },
+                                testBool: true
+                            }
+                        },
+                        App: {
+                            url: './assets/js/app.js',
+                            autoLoad: true
+                        }
+                    }
+                },
+                urls: {
+                    home: '/'
+                }
+            };
+            
+            (function(w, d) {
+                var script = d.createElement("script");
+                var scripts = d.getElementsByTagName("script");
+                var firstScript = scripts[0];
+                script.async = true;
+                script.src = w.JsContainerOptions.jsContainerFile;
+                script.charset = "UTF-8";
+                firstScript.parentNode.insertBefore(script, firstScript);
+            })(window, document);
+            
+        </script>
+    </body>
+</html>
