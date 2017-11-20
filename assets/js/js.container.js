@@ -10,6 +10,7 @@ function JsContainer() {
     };
     this.instances = {};
     this.autoLoadList = [];
+	this.loadingList = [];
     
     this.init();
 };
@@ -17,6 +18,7 @@ function JsContainer() {
 JsContainer.prototype.init = function() {
     this.mergeOptions();
     this.loadFiles();
+	this.autoLoad();
 };
 JsContainer.prototype.get = function(instanceName) {
     var instances = this.instances;
@@ -62,22 +64,43 @@ JsContainer.prototype.createInstance = function(instanceName) {
     
     return instance;
 };
-JsContainer.prototype.autoLoad = function(instanceName) {
+JsContainer.prototype.autoLoad = function() {
     var self = this;
-    if(typeof instanceName === 'undefined') {
+	if(this.isAllLoaded() === false) {
+		setTimeout(function() {
+			self.autoLoad();
+		}, 50);
+		
+		return false;
+	}
+	
+	var list = this.autoLoadList;
+	for(var key in list) {
+		this.get(list[key]);
+	}
+};
+JsContainer.prototype.isAllLoaded = function() {
+	var length = this.loadingList.length;
+	
+	return length === 0;
+};
+JsContainer.prototype.isLoaded = function(instanceName) {
+	var found = false;
+	for(var index in this.loadingList) {
+		var value = this.loadingList[index];
+		if(value === instanceName) {
+			found = true;
+			break;
+		}
+	}
+	
+	return found === false;
+};
+JsContainer.prototype.addToAutoloadList = function(instanceName) {
+	if(typeof instanceName === 'undefined') {
         return false;
     }
-    var length = this.autoLoadList.length;
-    this.autoLoadList.push(instanceName);
-    
-    if(length === 0) {
-        setTimeout(function() {
-            var list = self.autoLoadList;
-            for(var key in list) {
-                self.get(list[key]);
-            }
-        }, 200);
-    }
+	this.autoLoadList.push(instanceName);
 };
 JsContainer.prototype.loadFiles = function() {
     this.loadCssFiles();
@@ -95,12 +118,40 @@ JsContainer.prototype.loadJsFiles = function() {
     for(var key in files) {
         var params = files[key];
         var url = params.url;
-        this.loadJsFile(url);
-        var autoLoad = typeof params.autoLoad === 'undefined' ? false : params.autoLoad;
-        if(autoLoad === true) {
-            this.autoLoad(key);
+		if(typeof url === 'undefined') {
+			continue;
+		}
+        this.loadJsFile(params);
+		this.addToLoadingList(key);
+		this.markLoaded(key);
+		if(typeof params.autoLoad !== 'undefined' && params.autoLoad === true) {
+            this.addToAutoloadList(key);
         }
     }
+};
+JsContainer.prototype.addToLoadingList = function(instanceName) {
+	if(typeof instanceName === 'undefined') {
+        return false;
+    }
+	this.loadingList.push(instanceName);
+};
+JsContainer.prototype.markLoaded = function(instanceName) {
+	var self = this;
+	if(typeof window[instanceName] === 'undefined') {
+		setTimeout(function(){
+			self.markLoaded(instanceName);
+		}, 50);
+		
+		return false;
+	}
+	
+	for(var index in this.loadingList) {
+		var key = this.loadingList[index];
+		if(key === instanceName) {
+			this.loadingList.splice(index, 1);
+			break;
+		}
+	}
 };
 JsContainer.prototype.loadCssFile = function(url) {
     var tagName = 'link';
@@ -112,7 +163,8 @@ JsContainer.prototype.loadCssFile = function(url) {
     };
     this.loadFile(tagName, containerTagName, attributes);
 };
-JsContainer.prototype.loadJsFile = function(url) {
+JsContainer.prototype.loadJsFile = function(params) {
+	var url = params.url;
     var tagName = 'script';
     var containerTagName = 'body';
     var attributes = {
@@ -121,7 +173,29 @@ JsContainer.prototype.loadJsFile = function(url) {
         type: 'text/javascript',
         charset: 'UTF-8'
     };
-    this.loadFile(tagName, containerTagName, attributes);
+	if(typeof params.required !== 'undefined') {
+		this.waitRequiredFiles(params, tagName, containerTagName, attributes);
+	} else {
+		this.loadFile(tagName, containerTagName, attributes);
+	}
+};
+JsContainer.prototype.waitRequiredFiles = function(params, tagName, containerTagName, attributes) {
+	var self = this;
+	var found = false;
+	for(var index in params.required) {
+		var value = params.required[index];
+		if(this.isLoaded(value) === false) {
+			found = true;
+			break;
+		}
+	}
+	if(found === true) {
+		setTimeout(function(){
+			self.waitRequiredFiles(params, tagName, containerTagName, attributes);
+		}, 50);
+	} else {
+		this.loadFile(tagName, containerTagName, attributes);
+	}
 };
 JsContainer.prototype.loadFile = function(tagName, containerTagName, attributes) {
     var element = document.createElement(tagName);

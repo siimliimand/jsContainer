@@ -19,13 +19,24 @@ and open the template in the editor.
                 jsContainerFile: './assets/js/js.container.js',
                 files: {
                     css: {
+						bootstrap: 'https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css',
                         app: './assets/css/app.css'
                     },
                     js: {
-                        jquery: {
+                        jQuery: {
                             url: 'https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js',
                             autoLoad: true
                         },
+						Popper: {
+							url: 'https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js',
+							autoload: true,
+							required: ['jQuery']
+						},
+						bootstrap: {
+							url: 'https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js',
+							autoload: true,
+							required: ['jQuery', 'popper']
+						},
                         Test: {
                             url: './assets/js/test.js',
                             autoLoad: true
