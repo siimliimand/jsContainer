@@ -1,4 +1,69 @@
-function JsContainer() {
+Function.prototype.construct = function (aArgs) {
+    var fNewConstr = new Function("");
+    fNewConstr.prototype = this.prototype;
+    var oNew = new fNewConstr();
+    this.apply(oNew, aArgs);
+    return oNew;
+};
+
+
+
+/**
+ * JsContainer
+ * 
+ * @param ScriptLoader scriptLoader
+ * @returns {JsContainer}
+ */
+function JsContainer(scriptLoader) {
+    this.private = new __PrivateJsContainer(this, scriptLoader);
+    this.autoLoadList = [];
+    this.loadingList = [];
+
+    this.private.init();
+}
+;
+
+JsContainer.prototype.has = function (scriptName) {
+    return typeof window[scriptName] !== 'undefined';
+};
+JsContainer.prototype.get = function (scriptName, onload) {
+    var self = this;
+    if(this.has(scriptName) === false) {
+        this.private.loadScript({
+            type: 'js',
+            name: scriptName
+        }, onload);
+    } else if(typeof this.private.instances[scriptName] === 'undefined') {
+        self.private.createInstance(scriptName, function(instance) {
+            if(instance === false) {
+                onload();
+            } else {
+                self.get(scriptName, onload);
+            }
+        });
+    } else if(typeof onload !== 'undefined') {
+        onload(this.private.instances[scriptName]);
+    } else {
+        return this.private.instances[scriptName];
+    }
+    
+    return false;
+};
+
+
+
+
+/**
+ * Private JsContainer
+ * 
+ * @param JsContainer container
+ * @param ScriptLoader scriptLoader
+ * @returns {__PrivateJsContainer}
+ */
+function __PrivateJsContainer(container, scriptLoader) {
+    this.container = container;
+    this.scriptLoader = scriptLoader;
+    this.instances = {};
     this.options = {
         files: {
             css: {},
@@ -8,238 +73,173 @@ function JsContainer() {
             home: "/"
         }
     };
-    this.instances = {};
-    this.autoLoadList = [];
-	this.loadingList = [];
-    
-    this.init();
 };
 
-JsContainer.prototype.init = function() {
+__PrivateJsContainer.prototype.init = function () {
     this.mergeOptions();
-    this.loadFiles();
-	this.autoLoad();
+    this.autoLoad(function() {
+        //console.log('All script are loaded.')
+    });
 };
-JsContainer.prototype.get = function(instanceName) {
-    var instances = this.instances;
-    if(typeof instances[instanceName] !== 'undefined') {
-        return instances[instanceName];
-    }
-    
-    var instance = this.createInstance(instanceName);
-    if(typeof instance === 'undefined' || instance === false) {
+__PrivateJsContainer.prototype.getContainer = function () {
+    return this.container;
+};
+__PrivateJsContainer.prototype.mergeOptions = function () {
+    if (typeof window.JsContainerOptions === 'undefined') {
         return false;
     }
-    
-    return instance;
+
+    for (var key in window.JsContainerOptions) {
+        var value = window.JsContainerOptions[key];
+        this.addOption(this.options, key, value);
+    }
 };
-JsContainer.prototype.createInstance = function(instanceName) {
-    if(typeof window[instanceName] === 'undefined') {
-        return false;
+__PrivateJsContainer.prototype.addOption = function (options, key, value) {
+    if (typeof value === 'object') {
+        if (typeof options[key] === 'undefined') {
+            options[key] = value;
+        } else {
+            for (var k in value) {
+                var v = value[k];
+                this.addOption(options[key], k, v);
+            }
+        }
+    } else {
+        options[key] = value;
+    }
+};
+__PrivateJsContainer.prototype.autoLoad = function (done) {
+    var files = this.options.files;
+    var scriptNames = [];
+    for (var type in files) {
+        var scripts = files[type];
+        for (var scriptName in scripts) {
+            if(type === 'css') {
+                this.loadScript({
+                    type: type,
+                    name: scriptName
+                }, function() {});
+                continue;
+            }
+            
+            var params = scripts[scriptName];
+            if(params.autoload !== 'undefined' && params.autoload === false) {
+                continue;
+            }
+            scriptNames.push({
+                type: type,
+                name: scriptName
+            });
+        }
+    }
+    this.loadScripts(scriptNames, done, 0);
+};
+__PrivateJsContainer.prototype.loadScripts = function(scriptNames, done) {
+    var self = this;
+    var scriptName = this.getNextNotLoadedScriptName(scriptNames);
+    
+    if(scriptName === false) {
+        done();
+    } else {
+        this.loadScript(scriptName, function() {
+            self.loadScripts(scriptNames, done);
+        });
+    }
+};
+__PrivateJsContainer.prototype.getNextNotLoadedScriptName = function(scriptNames) {
+    for(var index in scriptNames) {
+        if(this.getContainer().has(scriptNames[index].name) === false) {
+            return scriptNames[index];
+        }
     }
     
+    return false;
+};
+__PrivateJsContainer.prototype.loadScript = function(scriptName, done) {
+    var params = this.getScriptParams(scriptName);
+    
+    if (typeof params.required === 'undefined') {
+        this.loadNotRequiredScripts(scriptName, params, done);
+    } else {
+        this.loadRequiredScripts(scriptName, params, done);
+    }
+};
+__PrivateJsContainer.prototype.loadNotRequiredScripts = function(scriptName, params, done) {
+    var self = this;
+    this.scriptLoader.addScript(scriptName.type, params.url, function() {
+        if(scriptName.type === 'css') {
+            done();
+        } else {
+            self.getContainer().get(scriptName.name, done);
+        }
+    });
+};
+__PrivateJsContainer.prototype.loadRequiredScripts = function(scriptName, params, done) {
+    var self = this;
+    var scriptNames = this.getNotLoadedScriptNames(scriptName, params);
+     
+    if(scriptNames.length <= 0) {
+        this.scriptLoader.addScript(scriptName.type, params.url, function() {
+            self.getContainer().get(scriptName.name, done);
+        });
+    } else {
+        this.loadScripts(scriptNames, done);
+    }
+};
+__PrivateJsContainer.prototype.getNotLoadedScriptNames = function(scriptName, params) {
+    var scriptNames = [];
+    for(var index in params.required) {
+        if(this.getContainer().has(params.required[index]) === false) {
+            scriptNames.push({
+                type: scriptName.type,
+                name: params.required[index]
+            });
+        }
+    }
+    
+    return scriptNames;
+};
+__PrivateJsContainer.prototype.getScriptParams = function (scriptName) {
+    var scripts = this.options.files[scriptName.type];
+    if (typeof scripts === 'undefined') {
+        return {};
+    }
+    var params = scripts[scriptName.name];
+    if (typeof params === 'undefined') {
+        return {};
+    }
+
+    return params;
+};
+__PrivateJsContainer.prototype.createInstance = function (instanceName, done) {
     var jsOptions = this.options.files.js[instanceName];
-    if(typeof jsOptions === 'undefined') {
+    if (typeof jsOptions === 'undefined') {
+        done(false);
         return false;
     }
-    
+
+    var arguments = this.getInstanceArguments(jsOptions);
+    var instance = false;
+    try {
+        instance = window[instanceName].construct(arguments);
+        this.instances[instanceName] = instance;
+        done(instance);
+    } catch (e) {
+        //console.log(e);
+        done(false);
+    }
+};
+__PrivateJsContainer.prototype.getInstanceArguments = function(jsOptions) {
     var arguments = [];
     var jsArguments = jsOptions.arguments;
-    if(typeof jsArguments !== 'undefined') {
-        for(var key in jsArguments) {
+    if (typeof jsArguments !== 'undefined') {
+        for (var key in jsArguments) {
             var value = jsArguments[key];
-            if(typeof value === 'function') {
+            if (typeof value === 'function') {
                 value = jsArguments[key]();
             }
             arguments.push(value);
         }
     }
-    
-    var instance = false;
-    try {
-        instance = window[instanceName].construct(arguments);
-    } catch(e) {
-        
-    }
-    
-    return instance;
+    return arguments;
 };
-JsContainer.prototype.autoLoad = function() {
-    var self = this;
-	if(this.isAllLoaded() === false) {
-		setTimeout(function() {
-			self.autoLoad();
-		}, 50);
-		
-		return false;
-	}
-	
-	var list = this.autoLoadList;
-	for(var key in list) {
-		this.get(list[key]);
-	}
-};
-JsContainer.prototype.isAllLoaded = function() {
-	var length = this.loadingList.length;
-	
-	return length === 0;
-};
-JsContainer.prototype.isLoaded = function(instanceName) {
-	var found = false;
-	for(var index in this.loadingList) {
-		var value = this.loadingList[index];
-		if(value === instanceName) {
-			found = true;
-			break;
-		}
-	}
-	
-	return found === false;
-};
-JsContainer.prototype.addToAutoloadList = function(instanceName) {
-	if(typeof instanceName === 'undefined') {
-        return false;
-    }
-	this.autoLoadList.push(instanceName);
-};
-JsContainer.prototype.loadFiles = function() {
-    this.loadCssFiles();
-    this.loadJsFiles();
-};
-JsContainer.prototype.loadCssFiles = function() {
-    var files = this.options.files.css;
-    for(var key in files) {
-        var url = files[key];
-        this.loadCssFile(url);
-    }
-};
-JsContainer.prototype.loadJsFiles = function() {
-    var files = this.options.files.js;
-    for(var key in files) {
-        var params = files[key];
-        var url = params.url;
-		if(typeof url === 'undefined') {
-			continue;
-		}
-        this.loadJsFile(params);
-		this.addToLoadingList(key);
-		this.markLoaded(key);
-		if(typeof params.autoLoad !== 'undefined' && params.autoLoad === true) {
-            this.addToAutoloadList(key);
-        }
-    }
-};
-JsContainer.prototype.addToLoadingList = function(instanceName) {
-	if(typeof instanceName === 'undefined') {
-        return false;
-    }
-	this.loadingList.push(instanceName);
-};
-JsContainer.prototype.markLoaded = function(instanceName) {
-	var self = this;
-	if(typeof window[instanceName] === 'undefined') {
-		setTimeout(function(){
-			self.markLoaded(instanceName);
-		}, 50);
-		
-		return false;
-	}
-	
-	for(var index in this.loadingList) {
-		var key = this.loadingList[index];
-		if(key === instanceName) {
-			this.loadingList.splice(index, 1);
-			break;
-		}
-	}
-};
-JsContainer.prototype.loadCssFile = function(url) {
-    var tagName = 'link';
-    var containerTagName = 'head';
-    var attributes = {
-        rel: 'stylesheet',
-        href: url,
-        type: 'text/css'
-    };
-    this.loadFile(tagName, containerTagName, attributes);
-};
-JsContainer.prototype.loadJsFile = function(params) {
-	var url = params.url;
-    var tagName = 'script';
-    var containerTagName = 'body';
-    var attributes = {
-        async: true,
-        src: url,
-        type: 'text/javascript',
-        charset: 'UTF-8'
-    };
-	if(typeof params.required !== 'undefined') {
-		this.waitRequiredFiles(params, tagName, containerTagName, attributes);
-	} else {
-		this.loadFile(tagName, containerTagName, attributes);
-	}
-};
-JsContainer.prototype.waitRequiredFiles = function(params, tagName, containerTagName, attributes) {
-	var self = this;
-	var found = false;
-	for(var index in params.required) {
-		var value = params.required[index];
-		if(this.isLoaded(value) === false) {
-			found = true;
-			break;
-		}
-	}
-	if(found === true) {
-		setTimeout(function(){
-			self.waitRequiredFiles(params, tagName, containerTagName, attributes);
-		}, 50);
-	} else {
-		this.loadFile(tagName, containerTagName, attributes);
-	}
-};
-JsContainer.prototype.loadFile = function(tagName, containerTagName, attributes) {
-    var element = document.createElement(tagName);
-    var containers = document.getElementsByTagName(containerTagName);
-    var container = containers[0];
-    for(var key in attributes) {
-        element[key] = attributes[key];
-    }
-    container.appendChild(element);
-};
-JsContainer.prototype.mergeOptions = function() {
-    var options = window.JsContainerOptions;
-    if(typeof options === 'undefined') {
-        return false;
-    }
-    if(typeof options.files !== 'undefined') {
-        if(typeof options.files.css !== 'undefined') {
-            for(var key in options.files.css) {
-                var url = options.files.css[key];
-                this.options.files.css[key] = url;
-            }
-        }
-        if(typeof options.files.js !== 'undefined') {
-            for(var key in options.files.js) {
-                var url = options.files.js[key];
-                this.options.files.js[key] = url;
-            }
-        }
-    }
-    if(typeof options.urls !== 'undefined') {
-        for(var key in options.urls) {
-            var url = options.urls[key];
-            this.options.urls[key] = url;
-        }
-    }
-};
-
-
-Function.prototype.construct = function (aArgs) {
-    var fNewConstr = new Function("");
-    fNewConstr.prototype = this.prototype;
-    var oNew = new fNewConstr();
-    this.apply(oNew, aArgs);
-    return oNew;
-};
-
-window.JsContainer = new JsContainer();

@@ -13,47 +13,54 @@ and open the template in the editor.
         <section id="main">
             Bla bla bla text text text.
         </section>
-        
-        <script>
-            var JsContainerOptions = window.JsContainerOptions = {
-                jsContainerFile: './assets/js/js.container.js',
+
+        <script id="js-container-script">
+            var JsContainerOptions = {
+                scriptLoaderFile: './assets/js/script.loader.min.js',
+                jsContainerFile: './assets/js/js.container.min.js',
                 files: {
                     css: {
-						bootstrap: 'https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css',
-                        app: './assets/css/app.css'
+                        bootstrapCss: {
+                            url: 'https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css'
+                        },
+                        appCss: {
+                            url: './assets/css/app.css'
+                        }
                     },
                     js: {
                         jQuery: {
                             url: 'https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js',
-                            autoLoad: true
+                            autoload: false
                         },
-						Popper: {
-							url: 'https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js',
-							autoload: true,
-							required: ['jQuery']
-						},
-						bootstrap: {
-							url: 'https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js',
-							autoload: true,
-							required: ['jQuery', 'Popper']
-						},
+                        Popper: {
+                            url: 'https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js',
+                            autoload: false,
+                            required: ['jQuery']
+                        },
+                        bootstrap: {
+                            url: 'https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js',
+                            autoload: true,
+                            required: ['jQuery', 'Popper']
+                        },
                         Test: {
                             url: './assets/js/test.js',
-                            autoLoad: true
+                            autoload: false
                         },
                         Test2: {
                             url: './assets/js/test2.js',
-                            autoLoad: false,
+                            autoload: false,
                             arguments: {
-                                test: function() {
-                                    return window.JsContainer.get('Test');
+                                test: function () {
+                                    return window.container.get('Test');
                                 },
                                 testBool: true
-                            }
+                            },
+                            required: ['Test']
                         },
                         App: {
                             url: './assets/js/app.js',
-                            autoLoad: true
+                            autoload: true,
+                            required: ['jQuery', 'Test2']
                         }
                     }
                 },
@@ -61,17 +68,13 @@ and open the template in the editor.
                     home: '/'
                 }
             };
-            
-            (function(w, d) {
-                var script = d.createElement("script");
-                var scripts = d.getElementsByTagName("script");
-                var firstScript = scripts[0];
-                script.async = true;
-                script.src = w.JsContainerOptions.jsContainerFile;
-                script.charset = "UTF-8";
-                firstScript.parentNode.insertBefore(script, firstScript);
-            })(window, document);
-            
+
+            !function(t,i,e,n){var r=i.createElement(n);r.async=!0,r.src=t.JsContainerOptions.scriptLoaderFile,
+            r.onload=function(){if(r.parentNode.removeChild(r),void 0!==t.ScriptLoader){var i=new t.ScriptLoader;
+            i.addScript(e,t.JsContainerOptions.jsContainerFile,function(){void 0!==t.JsContainer&&(t.container=new JsContainer(i))})}},
+            i.body.appendChild(r)}(window,document,"js","script");
+            var cs=document.getElementById("js-container-script");cs.parentNode.removeChild(cs);
+
         </script>
     </body>
 </html>

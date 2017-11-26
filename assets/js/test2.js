@@ -15,6 +15,10 @@ Test2.prototype.getTestName = function() {
         return false;
     }
     
+    if(typeof this.test === 'undefined' || this.test === false) {
+        return false;
+    }
+    
     return this.test.getName();
 };
 
