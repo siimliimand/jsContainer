@@ -67,6 +67,7 @@ function __PrivateJsContainer(container, scriptLoader) {
     this.options = {
         files: {
             css: {},
+            css2: {},
             js: {}
         },
         urls: {
@@ -114,7 +115,7 @@ __PrivateJsContainer.prototype.autoLoad = function (done) {
     for (var type in files) {
         var scripts = files[type];
         for (var scriptName in scripts) {
-            if(type === 'css') {
+            if(type === 'css' || type === 'css2') {
                 this.loadScript({
                     type: type,
                     name: scriptName
@@ -167,7 +168,7 @@ __PrivateJsContainer.prototype.loadScript = function(scriptName, done) {
 __PrivateJsContainer.prototype.loadNotRequiredScripts = function(scriptName, params, done) {
     var self = this;
     this.scriptLoader.addScript(scriptName.type, params.url, function() {
-        if(scriptName.type === 'css') {
+        if(scriptName.type === 'css' || scriptName.type === 'css2') {
             done();
         } else {
             self.getContainer().get(scriptName.name, done);
