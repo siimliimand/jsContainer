@@ -51,7 +51,7 @@ ScriptLoader.prototype.addScript = function (type, url, onload) {
     attributes.onload = function() {
         self.callback(onload);
         if(type === 'js') {
-            element.parentNode.removeChild(element);
+            //element.parentNode.removeChild(element);
         }
     };
     attributes.onerror = function() {
